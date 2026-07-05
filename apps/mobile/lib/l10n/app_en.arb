@@ -1,0 +1,39 @@
+{
+  "@@locale": "en",
+  "appTitle": "ICE",
+  "@appTitle": { "description": "The application title" },
+
+  "loginTitle": "Welcome back",
+  "loginSubtitle": "Sign in to pick up right where you left off.",
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "signInButton": "Sign in",
+  "loginErrorGeneric": "Couldn't sign you in. Check your details and try again.",
+
+  "workspaceGreeting": "What are we working on?",
+  "navChat": "Chat",
+  "navAgent": "Agent",
+  "navCoding": "Coding",
+  "navSettings": "Settings",
+
+  "chatInputHint": "Message ICE...",
+  "chatEmptyState": "Nothing here yet — say something to get started.",
+
+  "agentEmptyState": "No active tasks. Ask ICE to do something multi-step and it'll show up here.",
+  "agentAwaitingConfirmation": "Waiting on your confirmation",
+
+  "codingEmptyState": "Connect a project to get context-aware coding help.",
+
+  "settingsTitle": "Settings",
+  "settingsProviders": "AI Providers",
+  "settingsMemory": "Memory",
+  "settingsMemoryViewer": "View & manage what ICE remembers",
+  "settingsRoutingMode": "Routing mode",
+  "settingsRoutingModeAuto": "Automatic",
+  "settingsSignOut": "Sign out",
+
+  "profileTitle": "Profile",
+
+  "retry": "Retry",
+  "genericError": "Something went wrong."
+}

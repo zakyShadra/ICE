@@ -1,0 +1,8 @@
+dist
+build
+.turbo
+node_modules
+coverage
+pubspec.lock
+**/*.g.dart
+**/*.freezed.dart

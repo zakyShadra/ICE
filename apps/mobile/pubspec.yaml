@@ -1,0 +1,53 @@
+name: ice_mobile
+description: "ICE — Intelligent Cognitive Engine. Personal AI Operating System."
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management + DI — Document 2, Section 8.2: Riverpod chosen for
+  # compile-time-safe DI mirroring the backend's constructor-injection
+  # pattern, and trivial test overrides.
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Routing — Document 2, Section 8.2: go_router for deep-linkable,
+  # testable, declarative navigation that scales to Desktop's different
+  # nav shell without duplicating route logic.
+  go_router: ^14.2.0
+
+  # Networking
+  dio: ^5.5.0
+
+  # Secure token storage — Document 3, Section 5: the backend never
+  # issues tokens, Supabase does; the client stores what Supabase issues.
+  flutter_secure_storage: ^9.2.2
+
+  # Value equality for immutable state classes without codegen ceremony.
+  equatable: ^2.0.5
+
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  riverpod_generator: ^2.4.0
+  build_runner: ^2.4.11
+  custom_lint: ^0.6.4
+  riverpod_lint: ^2.3.10
+
+flutter:
+  uses-material-design: true
+  generate: true # enables flutter gen-l10n from lib/l10n/*.arb
+
+  assets:
+    - assets/images/

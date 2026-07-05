@@ -1,0 +1,26 @@
+{
+  "name": "@ice/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "description": "ICE Core — framework-independent Brain, Planner, Memory, Router, Agent, Executor, Observer, Tools. Has no dependency on Fastify, Flutter, or Supabase.",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@ice/types": "workspace:*"
+  },
+  "peerDependencies": {
+    "@prisma/client": "^5.16.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0"
+  }
+}

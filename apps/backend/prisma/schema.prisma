@@ -1,0 +1,247 @@
+// ICE — Prisma Schema
+// Implements the data design from Document 3 (Database Design & Authentication Strategy).
+// auth.users is owned entirely by Supabase Auth — user_profiles extends it 1:1
+// and is the only user-facing identity table ICE itself owns.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ---------------------------------------------------------------------------
+// Files (Phase 3 Part C addition — not in Document 3's original ER
+// diagram, which predates the Files feature being scoped. Extending the
+// schema here, following the same conventions as every other table,
+// rather than bolting file storage on with a different shape.)
+// ---------------------------------------------------------------------------
+
+model FileAsset {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  user         UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId    String?  @map("project_id") @db.Uuid
+  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileName     String   @map("file_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  storagePath  String   @map("storage_path") // path within the Supabase Storage bucket
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("file_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Identity (Document 3, Section 2.1 / 2.2)
+// ---------------------------------------------------------------------------
+
+model UserProfile {
+  id            String   @id @db.Uuid // FK to auth.users.id, not managed by Prisma migrations
+  displayName   String?  @map("display_name")
+  onboardedAt   DateTime? @map("onboarded_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  settings      UserSettings?
+  sessions      Session[]
+  memories      Memory[]
+  projects      Project[]
+  agentTasks    AgentTask[]
+  usageLogs     ProviderUsageLog[]
+  auditLogs     AuditLog[]
+  fileAssets    FileAsset[]
+
+  @@map("user_profiles")
+}
+
+model UserSettings {
+  userId               String   @id @map("user_id") @db.Uuid
+  user                 UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  enabledProviders     String[] @map("enabled_providers")
+  defaultRoutingMode   String   @default("auto") @map("default_routing_mode") // "auto" | provider id
+  memoryVisibilityOptIn Boolean @default(true) @map("memory_visibility_opt_in")
+
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("user_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Chat (Document 3, Section 2.3)
+// ---------------------------------------------------------------------------
+
+model Session {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  messages  Message[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Message {
+  id              String   @id @default(uuid()) @db.Uuid
+  sessionId       String   @map("session_id") @db.Uuid
+  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role            String   // "user" | "assistant" | "system"
+  content         String
+  providerUsed    String?  @map("provider_used")
+  routerMetadata  Json?    @map("router_metadata")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId, createdAt])
+  @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
+// Memory (Document 3, Section 2.4)
+// ---------------------------------------------------------------------------
+
+model Memory {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId       String?   @map("project_id") @db.Uuid
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type            String    // "session" | "long_term" | "project" | "knowledge"
+  content         String
+  metadata        Json      @default("{}")
+  relevanceScore  Float     @default(0) @map("relevance_score")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  lastAccessedAt  DateTime  @default(now()) @map("last_accessed_at")
+  expiresAt       DateTime? @map("expires_at")
+
+  @@index([userId, type])
+  @@index([userId, projectId])
+  @@map("memories")
+}
+
+// ---------------------------------------------------------------------------
+// Projects & Knowledge (Document 3, Section 2.5 / 2.6)
+// ---------------------------------------------------------------------------
+
+model Project {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  memories   Memory[]
+  documents  KnowledgeDocument[]
+  agentTasks AgentTask[]
+  fileAssets FileAsset[]
+
+  @@index([userId])
+  @@map("projects")
+}
+
+model KnowledgeDocument {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title      String
+  sourceUri  String?  @map("source_uri")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  chunks     KnowledgeChunk[]
+
+  @@index([projectId])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  document    KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content     String
+  chunkIndex  Int      @map("chunk_index")
+  // embedding vector(1536) — added via raw SQL migration; Prisma's
+  // pgvector support at schema-definition level is still evolving,
+  // so the column is declared in a companion migration, not here.
+
+  @@index([documentId])
+  @@map("knowledge_chunks")
+}
+
+// ---------------------------------------------------------------------------
+// Agent / Workflow (Document 3, Section 2.7)
+// ---------------------------------------------------------------------------
+
+model AgentTask {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId  String?  @map("project_id") @db.Uuid
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  goal       String
+  status     String   @default("planning") // planning | in_progress | completed | failed | cancelled
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  steps      AgentStep[]
+
+  @@index([userId])
+  @@map("agent_tasks")
+}
+
+model AgentStep {
+  id          String    @id @default(uuid()) @db.Uuid
+  taskId      String    @map("task_id") @db.Uuid
+  task        AgentTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  stepIndex   Int       @map("step_index")
+  status      String    // pending | approved | executing | completed | failed | denied
+  toolName    String    @map("tool_name")
+  input       Json
+  output      Json?
+  executedAt  DateTime? @map("executed_at")
+
+  @@index([taskId, stepIndex])
+  @@map("agent_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry & Audit (Document 3, Section 2.8, Section 2.8 CTO Note)
+// ---------------------------------------------------------------------------
+
+model ProviderUsageLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider      String
+  taskType      String   @map("task_type")
+  tokensIn      Int?     @map("tokens_in")
+  tokensOut     Int?     @map("tokens_out")
+  costEstimate  Float?   @map("cost_estimate")
+  latencyMs     Int      @map("latency_ms")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([provider, createdAt])
+  @@map("provider_usage_log")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor      String   // "user" | "system" | "agent"
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("audit_log")
+}
